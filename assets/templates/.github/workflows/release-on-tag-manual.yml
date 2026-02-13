@@ -1,0 +1,93 @@
+name: Release On Tag (Manual Packaging)
+
+on:
+  push:
+    tags:
+      # Keep this in sync with release-naming.env:TAG_PREFIX.
+      - "your-cli-v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to rebuild/release"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+          - os: linux
+            arch: arm64
+          - os: darwin
+            arch: amd64
+          - os: darwin
+            arch: arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Quality gate
+        run: make ci
+
+      - name: Build archive
+        env:
+          # Keep this in sync with release-naming.env:BINARY_NAME.
+          BINARY_NAME: your-cli
+        run: |
+          mkdir -p dist
+          # Keep output naming in sync with release-naming.env:ARTIFACT_GLOB.
+          out="${BINARY_NAME}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz"
+          tmpdir=$(mktemp -d)
+          # Update ./cmd/your-cli to your real command package.
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o "$tmpdir/$BINARY_NAME" ./cmd/your-cli
+          tar -czf "dist/$out" -C "$tmpdir" "$BINARY_NAME"
+          rm -rf "$tmpdir"
+
+      - name: Upload artifacts (intermediate)
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/*.tar.gz
+
+  publish:
+    needs: [release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Flatten artifacts
+        run: |
+          find dist -type f -name '*.tar.gz' -exec mv {} dist/ \;
+          find dist -type d -mindepth 1 -empty -delete
+
+      - name: Create checksums
+        run: |
+          (cd dist && sha256sum ./*.tar.gz > checksums.txt)
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          files: |
+            dist/*.tar.gz
+            dist/checksums.txt

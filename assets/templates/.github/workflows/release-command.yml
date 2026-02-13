@@ -1,0 +1,159 @@
+name: Release Command
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: "Release type"
+        required: true
+        type: choice
+        options: [patch, minor, major]
+      prerelease:
+        description: "Prerelease tag"
+        required: false
+        type: choice
+        options: ["", alpha, beta, rc]
+      ref:
+        description: "Branch/ref to release from"
+        required: false
+        default: main
+        type: string
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: read
+
+jobs:
+  parse:
+    if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '!release')
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.parse.outputs.should_release }}
+      release_type: ${{ steps.parse.outputs.release_type }}
+      prerelease: ${{ steps.parse.outputs.prerelease }}
+      ref: ${{ steps.parse.outputs.ref }}
+      issue_number: ${{ steps.parse.outputs.issue_number }}
+      requested_by: ${{ steps.parse.outputs.requested_by }}
+    steps:
+      - name: Parse release comment
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const body = context.payload.comment.body.trim();
+            const match = body.match(/!release\s+(patch|minor|major)(?:\s+(alpha|beta|rc))?/i);
+            const issueNumber = context.payload.issue.number;
+            const actor = context.payload.comment.user.login;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const safeComment = async (message) => {
+              try {
+                await github.rest.issues.createComment({ owner, repo, issue_number: issueNumber, body: message });
+              } catch (e) {
+                core.warning(`Failed to post issue comment: ${e.message}`);
+              }
+            };
+
+            if (!match) {
+              await safeComment(`@${actor} invalid command. Use: \`!release <patch|minor|major> [alpha|beta|rc]\`.`);
+              return;
+            }
+
+            const assoc = context.payload.comment.author_association;
+            const allowed = ['OWNER', 'MEMBER', 'COLLABORATOR'];
+            if (!allowed.includes(assoc)) {
+              await safeComment(`@${actor} you are not allowed to trigger release.`);
+              return;
+            }
+
+            if (!context.payload.issue.pull_request) {
+              await safeComment(`@${actor} release command only works in PR comments.`);
+              return;
+            }
+
+            const releaseType = match[1].toLowerCase();
+            const prerelease = (match[2] || '').toLowerCase();
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: issueNumber });
+
+            if (!pr.head.repo || pr.head.repo.full_name !== `${owner}/${repo}`) {
+              await safeComment(`@${actor} release from fork PR is not supported.`);
+              return;
+            }
+
+            await safeComment(`Release accepted: bump=${releaseType}${prerelease ? ` prerelease=${prerelease}` : ''}, ref=${pr.head.ref}`);
+            core.setOutput('should_release', 'true');
+            core.setOutput('release_type', releaseType);
+            core.setOutput('prerelease', prerelease);
+            core.setOutput('ref', pr.head.ref);
+            core.setOutput('issue_number', String(issueNumber));
+            core.setOutput('requested_by', actor);
+
+  create-tag:
+    needs: [parse]
+    if: |
+      always() && (
+        (github.event_name == 'issue_comment' && needs.parse.outputs.should_release == 'true') ||
+        github.event_name == 'workflow_dispatch'
+      )
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release-tag
+      cancel-in-progress: false
+    env:
+      # Keep this in sync with release-naming.env:TAG_PREFIX.
+      TAG_PREFIX: your-cli-v
+      RELEASE_TYPE: ${{ github.event_name == 'workflow_dispatch' && inputs.release_type || needs.parse.outputs.release_type }}
+      PRERELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || needs.parse.outputs.prerelease }}
+      SOURCE_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || needs.parse.outputs.ref }}
+      ISSUE_NUMBER: ${{ needs.parse.outputs.issue_number }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_REF }}
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Compute next version
+        id: version
+        run: |
+          chmod +x ./scripts/next-version.sh
+          version=$(./scripts/next-version.sh "$TAG_PREFIX" "$RELEASE_TYPE" "$PRERELEASE")
+          echo "tag=${TAG_PREFIX}${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push tag
+        run: |
+          tag='${{ steps.version.outputs.tag }}'
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "Tag already exists: $tag"
+            exit 1
+          fi
+          git tag "$tag"
+          git push origin "$tag"
+
+      - name: Comment result
+        if: always() && env.ISSUE_NUMBER != ''
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const ok = '${{ job.status }}' === 'success';
+            const body = ok
+              ? `Release tag created: ${{ steps.version.outputs.tag }}`
+              : `Release tag creation failed. Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: Number(process.env.ISSUE_NUMBER),
+              body,
+            });
