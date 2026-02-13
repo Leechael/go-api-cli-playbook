@@ -28,7 +28,7 @@ permissions:
 
 jobs:
   parse:
-    if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '!release')
+    if: github.event_name == 'issue_comment'
     runs-on: ubuntu-latest
     outputs:
       should_release: ${{ steps.parse.outputs.should_release }}
@@ -44,7 +44,15 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const body = context.payload.comment.body.trim();
+            const bodyRaw = (context.payload.comment.body || '');
+            const body = bodyRaw.trim();
+
+            // Keep trigger detection in one place and case-insensitive.
+            // Ignore unrelated comments without posting noise.
+            if (!body.toLowerCase().includes('!release')) {
+              return;
+            }
+
             const match = body.match(/!release\s+(patch|minor|major)(?:\s+(alpha|beta|rc))?/i);
             const issueNumber = context.payload.issue.number;
             const actor = context.payload.comment.user.login;

@@ -27,10 +27,11 @@ Use this checklist after copying templates.
 3. Ensure `TAG_PREFIX` in workflow matches `release-naming.env`.
 4. Ensure `scripts/next-version.sh` input uses the same `TAG_PREFIX`.
 5. Confirm `!release` grammar and prerelease policy.
-6. Keep PR-only gating for issue comment release commands.
-7. Verify fork PR handling is blocked.
-8. Ensure tag collision check exists before pushing.
-9. Keep comment steps as best-effort.
+6. Ensure `!release` detection is case-insensitive in parser logic (for example `!release`, `!Release`, `!RELEASE`).
+7. Keep PR-only gating for issue comment release commands.
+8. Verify fork PR handling is blocked.
+9. Ensure tag collision check exists before pushing.
+10. Keep comment steps as best-effort.
 
 ## Release Packaging
 
