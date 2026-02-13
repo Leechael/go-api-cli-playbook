@@ -13,6 +13,8 @@ Go API-to-CLI projects tend to accumulate the same issues across repos:
 
 This playbook captures those lessons into templates, scripts, and audit tools so they only need to be solved once.
 
+It also includes an OpenAPI-first path so a new CLI can be planned and tested from only `openapi.json`.
+
 ## What's Included
 
 ```
@@ -25,12 +27,14 @@ assets/templates/       # Copy-ready templates
 references/             # Decision guides and checklists
   github-actions-comparison.md
   github-actions-adoption-checklist.md
+  openapi-first-delivery.md
   release-packaging-strategies.md
   prek-precommit.md
 
 scripts/                # Bootstrap and audit tools
   init-prek.sh          #   Set up prek in a target repo
   init-release-naming.sh#   Bootstrap release-naming.env
+  openapi-bootstrap.sh  #   Build command/test plan from openapi.json
   print-release-download.sh  # Generate correct download commands
   audit-workflows.sh    #   Detect workflow config drift
   audit-release-naming.sh   # Detect naming contract drift
@@ -46,16 +50,19 @@ Apply the playbook to a target Go CLI repository:
 # 1. Bootstrap the release naming contract
 ./scripts/init-release-naming.sh /path/to/your-repo
 
-# 2. Set up pre-commit gate
+# 2. If starting from API docs only, generate plan artifacts
+./scripts/openapi-bootstrap.sh /path/to/openapi.json /path/to/your-repo/docs/openapi
+
+# 3. Set up pre-commit gate
 ./scripts/init-prek.sh /path/to/your-repo
 
-# 3. Copy workflow templates into your repo and replace placeholders
+# 4. Copy workflow templates into your repo and replace placeholders
 
-# 4. Audit for drift
+# 5. Audit for drift
 ./scripts/audit-workflows.sh /path/to/your-repo
 ./scripts/audit-release-naming.sh /path/to/your-repo
 
-# 5. Validate locally
+# 6. Validate locally
 prek run --all-files
 go test ./...
 ```

@@ -21,6 +21,7 @@
 3. 质量门禁（prek pre-commit）
 4. 发布命名契约（解决 download 名称漂移）
 5. 审计脚本（可自动发现配置漂移）
+6. OpenAPI-only 启动路径（仅凭 `openapi.json` 生成命令与测试计划）
 
 ## 3) 设计原则
 
@@ -42,6 +43,9 @@
 6. 最小可用但可扩展
 - 先提供统一模板与 checklist，再按具体项目收敛细节。
 
+7. Spec-first 可交付
+- 允许在没有现成代码时，只根据 `openapi.json` 先生成命令覆盖计划和测试矩阵，再进入实现。
+
 ## 4) 核心产出结构
 
 - `SKILL.md`
@@ -49,6 +53,7 @@
 - `references/`
   - `github-actions-comparison.md`
   - `github-actions-adoption-checklist.md`
+  - `openapi-first-delivery.md`
   - `release-packaging-strategies.md`
   - `prek-precommit.md`
 - `assets/templates/`
@@ -62,6 +67,7 @@
 - `scripts/`
   - `init-prek.sh`
   - `init-release-naming.sh`
+  - `openapi-bootstrap.sh`
   - `print-release-download.sh`
   - `audit-workflows.sh`
   - `audit-release-naming.sh`
@@ -80,6 +86,9 @@
 4. 增加 naming 审计
 - 原因：即使有模板，后续维护仍会漂移，需自动检测。
 
+5. 增加 OpenAPI bootstrap
+- 原因：新项目常只有 API 文档，先生成“命令计划 + 测试矩阵”可降低启动成本并防止漏接口。
+
 ## 6) 当前约束
 
 - workflow 模板中的占位符（如 `your-cli`）必须在落地时替换。
@@ -97,6 +106,8 @@
 5. 本地执行：
    - `prek run --all-files`
    - `go test ...`
+6. 如果是文档先行项目：
+   - `scripts/openapi-bootstrap.sh <openapi.json> <repo>/docs/openapi`
 
 ## 8) 后续演进建议
 

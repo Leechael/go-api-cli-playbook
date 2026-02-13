@@ -10,6 +10,7 @@ Use this skill when a Go project is converting an API into a CLI and you need pr
 ## Outcomes
 
 - Consistent CLI I/O contract for humans, scripts, and LLMs.
+- OpenAPI-first delivery path from only `openapi.json`.
 - Repeatable testing strategy: unit + BDD + opt-in integration.
 - Reusable GitHub Actions workflow templates for CI and release.
 - Reduced workflow drift by reusing templates and audit checks.
@@ -17,16 +18,18 @@ Use this skill when a Go project is converting an API into a CLI and you need pr
 ## Workflow
 
 1. Confirm target commands, output contract, and release policy.
-2. Define release naming contract in one place with `scripts/init-release-naming.sh <repo-dir>`.
-3. Initialize pre-commit gate with `scripts/init-prek.sh <repo-dir>`.
-4. Run `prek validate-config` and `prek install --install-hooks`.
-5. Apply the GitHub Actions baseline from `assets/templates/.github/workflows/`.
-6. Choose one packaging strategy:
+2. If you only have API docs, generate implementation inputs from `openapi.json`:
+   - `scripts/openapi-bootstrap.sh <openapi.json> <output-dir>`
+3. Define release naming contract in one place with `scripts/init-release-naming.sh <repo-dir>`.
+4. Initialize pre-commit gate with `scripts/init-prek.sh <repo-dir>`.
+5. Run `prek validate-config` and `prek install --install-hooks`.
+6. Apply the GitHub Actions baseline from `assets/templates/.github/workflows/`.
+7. Choose one packaging strategy:
    - GoReleaser publish (`release-on-tag.yml`)
    - Manual archive + upload (`release-on-tag-manual.yml`)
-7. Adapt versioning with `assets/templates/scripts/next-version.sh`.
-8. Validate repository-specific commands (`go test`, BDD command, build path, release tool).
-9. Run `scripts/audit-workflows.sh` and `scripts/audit-release-naming.sh` and fix all findings.
+8. Adapt versioning with `assets/templates/scripts/next-version.sh`.
+9. Validate repository-specific commands (`go test`, BDD command, build path, release tool).
+10. Run `scripts/audit-workflows.sh` and `scripts/audit-release-naming.sh` and fix all findings.
 
 ## Required CLI Contract
 
@@ -59,10 +62,20 @@ Use this skill when a Go project is converting an API into a CLI and you need pr
 - Any `gh release` command must read from this contract, never hardcode old names.
 - For download docs/examples, generate command via `scripts/print-release-download.sh`.
 
+## OpenAPI-First Contract (Required When Spec-Driven)
+
+- Minimum input: one OpenAPI JSON file.
+- Run `scripts/openapi-bootstrap.sh` to produce:
+  - operations inventory (`openapi-operations.tsv`)
+  - command plan (`openapi-command-plan.md`)
+  - test matrix (`openapi-test-matrix.md`)
+- Use generated operation IDs as canonical command intent when API docs are the only source.
+
 ## What To Load
 
 - For side-by-side lessons and pitfalls: `references/github-actions-comparison.md`
 - For rollout checklist: `references/github-actions-adoption-checklist.md`
+- For OpenAPI-only delivery flow: `references/openapi-first-delivery.md`
 - For packaging strategy and naming mapping: `references/release-packaging-strategies.md`
 - For `prek` setup and commands: `references/prek-precommit.md`
 - For copy-ready templates: `assets/templates/.github/workflows/*.yml`
@@ -70,6 +83,7 @@ Use this skill when a Go project is converting an API into a CLI and you need pr
 - For naming contract template: `assets/templates/release-naming.env`
 - For a ready `prek` config: `assets/templates/prek.toml`
 - For download command helper: `scripts/print-release-download.sh`
+- For OpenAPI bootstrap: `scripts/openapi-bootstrap.sh`
 - For bootstrap helper script: `scripts/init-prek.sh`
 - For naming contract bootstrap: `scripts/init-release-naming.sh`
 - For naming drift audit: `scripts/audit-release-naming.sh`
