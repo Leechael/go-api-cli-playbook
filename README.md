@@ -73,9 +73,9 @@ go test ./...
 
 **Testing** — Run `prek run --all-files` before tests. Unit tests via `go test ./...`. BDD paths must be explicit. Integration tests are opt-in (tagged and credential-gated).
 
-**CI/CD** — CI runs formatting, vet/lint, tests, and build. A separate release-command workflow parses, validates, and creates tags. A tag-triggered workflow builds artifacts and publishes the release.
+**CI/CD** — CI runs formatting, vet/lint, tests, and build. `Release` supports PR comment (`!release patch|minor|major`) and manual dispatch. Tag creation dispatches `release-on-tag.yml`, which builds artifacts, generates changelog, and publishes GitHub Release.
 
-**Release Naming** — `CLI_NAME`, `BINARY_NAME`, `TAG_PREFIX`, and `ARTIFACT_GLOB` live in `release-naming.env` as the single source of truth. No hardcoding elsewhere.
+**Release Naming** — `CLI_NAME`, `BINARY_NAME`, `TAG_PREFIX`, `ARTIFACT_GLOB`, and `BUILD_TARGET` live in `release-naming.env` as the single source of truth. No hardcoding elsewhere.
 
 ## As a Claude Code Skill
 

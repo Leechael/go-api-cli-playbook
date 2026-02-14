@@ -1,19 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage:
-#   ./scripts/next-version.sh <tag-prefix> <patch|minor|major> [alpha|beta|rc]
-# Example:
-#   ./scripts/next-version.sh roam-cli-v patch beta
+# Usage: ./scripts/next-version.sh <patch|minor|major>
+# Output: new version without prefix (e.g. 1.2.4)
 
-TAG_PREFIX="${1:-}"
-BUMP="${2:-patch}"
-PRE="${3:-}"
-
-if [[ -z "$TAG_PREFIX" ]]; then
-  echo "tag prefix is required" >&2
-  exit 1
-fi
+BUMP="${1:-patch}"
 
 case "$BUMP" in
   patch|minor|major) ;;
@@ -23,14 +14,18 @@ case "$BUMP" in
     ;;
 esac
 
-if [[ -n "$PRE" ]]; then
-  case "$PRE" in
-    alpha|beta|rc) ;;
-    *)
-      echo "invalid prerelease: $PRE" >&2
-      exit 1
-      ;;
-  esac
+env_file="release-naming.env"
+if [[ ! -f "$env_file" ]]; then
+  echo "missing naming contract file: $env_file" >&2
+  exit 1
+fi
+
+# shellcheck disable=SC1090
+source "$env_file"
+
+if [[ -z "${TAG_PREFIX:-}" ]]; then
+  echo "TAG_PREFIX is empty in $env_file" >&2
+  exit 1
 fi
 
 latest_tag=$(git tag -l "${TAG_PREFIX}*" --sort=-version:refname | head -n1)
@@ -62,16 +57,4 @@ case "$BUMP" in
 esac
 
 version="${major}.${minor}.${patch}"
-
-if [[ -n "$PRE" ]]; then
-  max_n=0
-  while IFS= read -r tag; do
-    suffix="${tag#${TAG_PREFIX}${version}-${PRE}.}"
-    if [[ "$suffix" =~ ^[0-9]+$ ]] && (( suffix > max_n )); then
-      max_n=$suffix
-    fi
-  done < <(git tag -l "${TAG_PREFIX}${version}-${PRE}.*")
-  version="${version}-${PRE}.$((max_n + 1))"
-fi
-
 echo "$version"

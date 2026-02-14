@@ -22,6 +22,7 @@
 4. 发布命名契约（解决 download 名称漂移）
 5. 审计脚本（可自动发现配置漂移）
 6. OpenAPI-only 启动路径（仅凭 `openapi.json` 生成命令与测试计划）
+7. 统一发布验收标准（评论触发/手动触发/tag+release/changelog/下载命令一致）
 
 ## 3) 设计原则
 
@@ -92,8 +93,9 @@
 ## 6) 当前约束
 
 - workflow 模板中的占位符（如 `your-cli`）必须在落地时替换。
-- `release-naming.env` 必须与 workflow 触发 tag 模式一致。
+- `release-naming.env` 必须与 workflow 触发 tag 模式一致（默认 `TAG_PREFIX=v`，即 `v*`）。
 - `gh release download` 示例必须通过 `scripts/print-release-download.sh` 生成。
+- `release-command` 必须在打 tag 后显式 dispatch `release-on-tag.yml`，不能依赖 tag push 隐式触发。
 
 ## 7) 推荐落地顺序（给目标仓库）
 

@@ -14,6 +14,12 @@ Use this skill when a Go project is converting an API into a CLI and you need pr
 - Repeatable testing strategy: unit + BDD + opt-in integration.
 - Reusable GitHub Actions workflow templates for CI and release.
 - Reduced workflow drift by reusing templates and audit checks.
+- Release flow that passes these acceptance rules:
+  - PR comment `!release [patch|minor|major]` works.
+  - Manual workflow dispatch works.
+  - Every publish creates `vX.Y.Z` tag and GitHub Release.
+  - Artifacts are multi-platform and unpack to one binary name.
+  - Changelog is generated and used as GitHub Release notes.
 
 ## Workflow
 
@@ -25,8 +31,8 @@ Use this skill when a Go project is converting an API into a CLI and you need pr
 5. Run `prek validate-config` and `prek install --install-hooks`.
 6. Apply the GitHub Actions baseline from `assets/templates/.github/workflows/`.
 7. Choose one packaging strategy:
-   - GoReleaser publish (`release-on-tag.yml`)
-   - Manual archive + upload (`release-on-tag-manual.yml`)
+   - Canonical manual packaging (`release-on-tag.yml`)
+   - Alternative manual packaging variant (`release-on-tag-manual.yml`)
 8. Adapt versioning with `assets/templates/scripts/next-version.sh`.
 9. Validate repository-specific commands (`go test`, BDD command, build path, release tool).
 10. Run `scripts/audit-workflows.sh` and `scripts/audit-release-naming.sh` and fix all findings.
@@ -48,8 +54,11 @@ Use this skill when a Go project is converting an API into a CLI and you need pr
 ## GitHub Actions Contract
 
 - CI workflow must run formatting, vet/lint, tests, and build.
-- Release command workflow should only parse/validate and create tags.
-- Tag-triggered release workflow should build artifacts and publish release.
+- Release workflow must support both:
+  - PR comment trigger (`!release <patch|minor|major>`)
+  - Manual workflow dispatch
+- Release command workflow should parse/authorize/create tag, then explicitly dispatch `release-on-tag.yml`.
+- Tag-triggered release workflow should build artifacts, generate changelog, and publish release.
 - Commenting back to PR/issue should be best-effort (`continue-on-error: true`).
 
 ## Release Naming Contract (Required)
@@ -59,6 +68,7 @@ Use this skill when a Go project is converting an API into a CLI and you need pr
   - `BINARY_NAME`
   - `TAG_PREFIX`
   - `ARTIFACT_GLOB`
+  - `BUILD_TARGET`
 - Any `gh release` command must read from this contract, never hardcode old names.
 - For download docs/examples, generate command via `scripts/print-release-download.sh`.
 

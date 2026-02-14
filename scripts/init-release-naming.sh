@@ -46,6 +46,7 @@ Copied template:
   $dest
 
 Next steps:
-  edit CLI_NAME/BINARY_NAME/TAG_PREFIX/ARTIFACT_GLOB in $dest
+  edit CLI_NAME/BINARY_NAME/ARTIFACT_GLOB/BUILD_TARGET in $dest
+  keep TAG_PREFIX=v unless you have a strict migration reason
   ensure workflow tag patterns and artifact names match this file
 EOF

@@ -1,14 +1,13 @@
-name: Release On Tag (Manual Packaging)
+name: Release on Tag (Manual Packaging)
 
 on:
   push:
     tags:
-      # Keep this in sync with release-naming.env:TAG_PREFIX.
-      - "your-cli-v*"
+      - "v*" # keep in sync with TAG_PREFIX in release-naming.env
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to rebuild/release"
+        description: "Tag to release (e.g. v1.2.3)"
         required: true
         type: string
 
@@ -16,26 +15,17 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  build-release:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: linux
-            arch: amd64
-          - os: linux
-            arch: arm64
-          - os: darwin
-            arch: amd64
-          - os: darwin
-            arch: arm64
+    env:
+      GOFLAGS: -buildvcs=false
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -43,51 +33,78 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Quality gate
-        run: make ci
+      - name: Setup Python (for prek)
+        if: ${{ hashFiles('prek.toml') != '' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
 
-      - name: Build archive
-        env:
-          # Keep this in sync with release-naming.env:BINARY_NAME.
-          BINARY_NAME: your-cli
+      - name: Install prek
+        if: ${{ hashFiles('prek.toml') != '' }}
         run: |
+          python -m pip install --upgrade pip
+          python -m pip install prek
+          prek --version
+
+      - name: Run pre-commit checks (prek)
+        if: ${{ hashFiles('prek.toml') != '' }}
+        run: |
+          prek validate-config
+          prek run --all-files
+
+      - name: Validate naming contract
+        run: |
+          test -f release-naming.env
+          source release-naming.env
+          test -n "$BINARY_NAME"
+          test -n "$TAG_PREFIX"
+          test -n "$ARTIFACT_GLOB"
+          test -n "$BUILD_TARGET"
+
+      - name: Build cross-platform artifacts
+        run: |
+          source release-naming.env
           mkdir -p dist
-          # Keep output naming in sync with release-naming.env:ARTIFACT_GLOB.
-          out="${BINARY_NAME}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz"
-          tmpdir=$(mktemp -d)
-          # Update ./cmd/your-cli to your real command package.
-          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o "$tmpdir/$BINARY_NAME" ./cmd/your-cli
-          tar -czf "dist/$out" -C "$tmpdir" "$BINARY_NAME"
-          rm -rf "$tmpdir"
-
-      - name: Upload artifacts (intermediate)
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-${{ matrix.os }}-${{ matrix.arch }}
-          path: dist/*.tar.gz
-
-  publish:
-    needs: [release]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: dist
-
-      - name: Flatten artifacts
-        run: |
-          find dist -type f -name '*.tar.gz' -exec mv {} dist/ \;
-          find dist -type d -mindepth 1 -empty -delete
-
-      - name: Create checksums
-        run: |
+          for os in darwin linux; do
+            for arch in amd64 arm64; do
+              artifact="dist/${BINARY_NAME}-${os}-${arch}.tar.gz"
+              tmpdir=$(mktemp -d)
+              CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -o "$tmpdir/${BINARY_NAME}" "$BUILD_TARGET"
+              tar -czf "$artifact" -C "$tmpdir" "$BINARY_NAME"
+              rm -rf "$tmpdir"
+            done
+          done
           (cd dist && sha256sum ./*.tar.gz > checksums.txt)
 
-      - name: Publish GitHub release
+      - name: Generate CHANGELOG.md
+        run: |
+          source release-naming.env
+          current_tag="${RELEASE_TAG}"
+          previous_tag=$(git tag -l "${TAG_PREFIX}*" --sort=-version:refname | grep -v "^${current_tag}$" | head -n 1 || true)
+
+          {
+            echo "# Changelog"
+            echo
+            echo "## ${current_tag}"
+            echo
+            if [ -n "${previous_tag}" ]; then
+              echo "Changes since ${previous_tag}:"
+              echo
+              git log --pretty='- %s (%h)' "${previous_tag}..${current_tag}"
+            else
+              echo "Initial release changes:"
+              echo
+              git log --pretty='- %s (%h)' "${current_tag}"
+            fi
+          } > dist/CHANGELOG.md
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          body_path: dist/CHANGELOG.md
           files: |
             dist/*.tar.gz
             dist/checksums.txt
+            dist/CHANGELOG.md
+          prerelease: ${{ contains(env.RELEASE_TAG, '-alpha.') || contains(env.RELEASE_TAG, '-beta.') || contains(env.RELEASE_TAG, '-rc.') }}

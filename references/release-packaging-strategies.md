@@ -1,58 +1,52 @@
 # Release Packaging Strategies
 
-This reference prevents naming drift between workflows, docs, and release download commands.
+This reference keeps release behavior consistent even when projects choose different packaging tools.
 
-## Strategy A: GoReleaser
+## Mandatory Outcomes (Both Strategies)
 
-Use when:
-- You want one declarative config (`.goreleaser.yaml`) for build + archives + checksums + changelog.
-- You need multi-platform packaging with low maintenance.
+1. Release tag format is `vX.Y.Z`.
+2. GitHub Release is created for each tag.
+3. Artifacts include darwin/linux x amd64/arm64 builds.
+4. Archive contains a consistent binary name (`BINARY_NAME`).
+5. `dist/CHANGELOG.md` is generated and used as release body.
+6. Download command examples use `ARTIFACT_GLOB`.
 
-Naming source of truth:
-- `.goreleaser.yaml` (archive naming and binary naming)
-- `release-naming.env` (public docs and `gh` command hints)
+## Strategy A: Canonical Manual Packaging (Template Default)
 
-Notes:
-- Keep `TAG_PREFIX` aligned between workflow and goreleaser expectations.
-- Keep `ARTIFACT_GLOB` aligned with produced archives.
+Use `release-on-tag.yml` from templates.
 
-## Strategy B: Manual Cross-Build + Upload
+- Pros:
+  - fully explicit artifact naming and changelog generation
+  - no extra config file required
+- Contract:
+  - read `BINARY_NAME`, `TAG_PREFIX`, `ARTIFACT_GLOB`, `BUILD_TARGET` from `release-naming.env`
 
-Use when:
-- You need custom packaging behavior that is awkward in GoReleaser.
-- You want direct shell-level control for artifact layout.
+## Strategy B: GoReleaser
 
-Naming source of truth:
-- `release-naming.env`
-- `release-on-tag-manual.yml` build/upload steps
+Use when a repo already has mature `.goreleaser.yml`.
 
-Notes:
-- Use one archive filename template for all matrix entries.
-- Write checksums with a stable filename (`checksums.txt`).
+- Required alignment:
+  - `.goreleaser.yml` archive names must match `ARTIFACT_GLOB`
+  - binary names in archives must match `BINARY_NAME`
+  - release notes/changelog must be enabled and equivalent to `dist/CHANGELOG.md` behavior
+  - workflow still needs explicit dispatch path and `v*` tag trigger
 
 ## Required Naming Contract
 
 Define once in `release-naming.env`:
 
-- `CLI_NAME` (repo-facing logical name)
-- `BINARY_NAME` (actual executable)
-- `TAG_PREFIX` (for example `v` or `roam-cli-v`)
-- `ARTIFACT_GLOB` (for example `roam-cli-*.tar.gz`)
+- `CLI_NAME`
+- `BINARY_NAME`
+- `TAG_PREFIX` (default: `v`)
+- `ARTIFACT_GLOB` (for example: `mycli-*.tar.gz`)
+- `BUILD_TARGET` (for example: `./cmd/mycli`)
 
-## Safe `gh release download` Usage
+## Safe Download Command
 
-Never hardcode names directly in docs.
+Never hardcode download pattern in docs.
 
 Use:
 
 ```sh
 scripts/print-release-download.sh <tag>
 ```
-
-It prints a command template based on `release-naming.env`.
-
-## Drift Signals
-
-- Release succeeds but docs download command returns "no assets match".
-- Tag is created with one prefix, publish workflow listens to another prefix.
-- Binary name in archive differs from README installation examples.
