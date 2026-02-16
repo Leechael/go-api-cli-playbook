@@ -76,5 +76,18 @@ jobs:
           fi
           bash -lc "$BDD_TEST_CMD"
 
+      - name: Load release naming
+        run: |
+          if [ -f release-naming.env ]; then
+            source release-naming.env
+            echo "BUILD_TARGET=${BUILD_TARGET}" >> "$GITHUB_ENV"
+            echo "BINARY_NAME=${BINARY_NAME}" >> "$GITHUB_ENV"
+          else
+            echo "BUILD_TARGET=./cmd/your-cli" >> "$GITHUB_ENV"
+            echo "BINARY_NAME=your-cli" >> "$GITHUB_ENV"
+          fi
+
       - name: Build
-        run: go build -v ./cmd/your-cli
+        run: |
+          mkdir -p bin
+          go build -v -o "bin/${BINARY_NAME}" "${BUILD_TARGET}"
