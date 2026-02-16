@@ -24,32 +24,38 @@ Use this skill when a Go project is converting an API into a CLI and you need pr
 
 ## Workflow
 
+> **Steps 1–5 create the project scaffold. Do NOT write any Go command code until all scaffold files exist and `make build` succeeds with a skeleton binary.**
+
 1. Confirm target commands, output contract, and release policy.
 2. If you only have API docs, generate implementation inputs from `openapi.json`:
    - `scripts/openapi-bootstrap.sh <openapi.json> <output-dir>`
-3. Define release naming contract in one place with `scripts/init-release-naming.sh <repo-dir>`.
-4. Initialize project files with `scripts/init-project-files.sh <repo-dir>`:
-   - Copies Makefile, .gitignore, and README.md templates.
-   - Customize placeholders (`your-cli`, `OWNER/REPO`, `YOUR_SERVICE_NAME`) to match `release-naming.env`.
-5. Scaffold Go package layout:
-   - `cmd/<cli-name>/main.go` (minimal entry point)
-   - `internal/cmd/root.go` (`NewRootCmd` factory, global flags, exit codes)
-   - `internal/client/client.go` (HTTP client)
-   - `internal/model/` (response/request structs)
-   - `internal/output/output.go` (`Formatter`)
-   - `tests/bdd/`
+3. **Create `release-naming.env`** — run `scripts/init-release-naming.sh <repo-dir>` or copy from `assets/templates/release-naming.env`. Replace every `your-cli` placeholder with the actual CLI name. Verify all 5 variables are set.
+4. **Initialize project files** — run `scripts/init-project-files.sh <repo-dir>`:
+   - Copies Makefile, .gitignore, and README.md from `assets/templates/`.
+   - Replace placeholders (`your-cli`, `OWNER/REPO`, `YOUR_SERVICE_NAME`) to match `release-naming.env`.
+   - Copy `assets/templates/scripts/next-version.sh` to `scripts/next-version.sh` and `chmod +x`.
+5. **Scaffold Go packages** (all of these, not just some):
+   - `cmd/<cli-name>/main.go` — minimal entry point.
+   - `internal/cmd/root.go` — `NewRootCmd` factory, global flags, exit codes.
+   - `internal/client/client.go` — HTTP client skeleton.
+   - `internal/model/` — at least one model file.
+   - `internal/output/output.go` — `Formatter` skeleton.
+   - `tests/bdd/features/` and `tests/bdd/steps/` — directories created.
+   - Run `go mod init github.com/<owner>/<repo>` and `go mod tidy`.
+   - **Checkpoint**: `make build` must succeed before proceeding.
    - Load `references/go-code-architecture.md` for exact patterns.
-6. Initialize pre-commit gate with `scripts/init-prek.sh <repo-dir>`.
-7. Run `prek validate-config` and `prek install --install-hooks`.
-8. Apply the GitHub Actions baseline from `assets/templates/.github/workflows/`.
-9. Choose one packaging strategy:
-   - Canonical manual packaging (`release-on-tag.yml`)
-   - Alternative manual packaging variant (`release-on-tag-manual.yml`)
-10. Adapt versioning with `assets/templates/scripts/next-version.sh`.
-11. Validate repository-specific commands (`go test`, BDD command, build path, release tool).
-12. Run `scripts/audit-workflows.sh` and `scripts/audit-release-naming.sh` and fix all findings.
-13. If the project is also an agent skill, scaffold `skills/<name>/SKILL.md` with command mapping, usage examples, and error handling rules.
-14. Run delivery verification (see below).
+6. **Apply GitHub Actions** — copy all workflow files from `assets/templates/.github/workflows/`:
+   - `go-ci.yml` (required)
+   - `release-command.yml` (required)
+   - `release-on-tag.yml` or `release-on-tag-manual.yml` (choose one)
+   - Customize `BUILD_TARGET` and binary name references to match `release-naming.env`.
+7. Initialize pre-commit gate with `scripts/init-prek.sh <repo-dir>`.
+8. Run `prek validate-config` and `prek install --install-hooks`.
+9. Implement commands, client methods, and models (the bulk of development).
+10. Validate repository-specific commands (`go test`, BDD command, build path, release tool).
+11. Run `scripts/audit-workflows.sh` and `scripts/audit-release-naming.sh` and fix all findings.
+12. If the project is also an agent skill, scaffold `skills/<name>/SKILL.md` with command mapping, usage examples, and error handling rules.
+13. **Run delivery verification** (see below) — every item must pass.
 
 ## Required CLI Contract
 
@@ -67,6 +73,44 @@ Use this skill when a Go project is converting an API into a CLI and you need pr
 - Auth/connectivity check uses a `status` command (not `auth check` or similar).
 - Credentials via environment variable named `<SERVICE>_API_TOKEN` (e.g. `READWISE_API_TOKEN`).
 - `list` commands should accept `ls` as an alias.
+
+## Project Scaffold Contract
+
+These files must exist before writing any Go code. They are not optional and must not be skipped.
+
+### Required Files (copy from templates)
+
+| File | Source Template | Action |
+|------|---------------|--------|
+| `release-naming.env` | `assets/templates/release-naming.env` | Copy, replace `your-cli` with actual CLI name |
+| `Makefile` | `assets/templates/Makefile` | Copy, replace `your-cli` with actual CLI name |
+| `.gitignore` | `assets/templates/.gitignore` | Copy as-is |
+| `README.md` | `assets/templates/README.md` | Copy, customize for the project |
+| `scripts/next-version.sh` | `assets/templates/scripts/next-version.sh` | Copy as-is, `chmod +x` |
+| `.github/workflows/go-ci.yml` | `assets/templates/.github/workflows/go-ci.yml` | Copy, customize build target |
+| `.github/workflows/release-command.yml` | `assets/templates/.github/workflows/release-command.yml` | Copy as-is |
+| `.github/workflows/release-on-tag.yml` | `assets/templates/.github/workflows/release-on-tag.yml` | Copy as-is (or use `-manual` variant) |
+
+### release-naming.env
+
+Must contain all 5 variables — no variable may be left as placeholder:
+
+```
+CLI_NAME=<actual-cli-name>
+BINARY_NAME=<actual-cli-name>
+TAG_PREFIX=v
+ARTIFACT_GLOB=<actual-cli-name>-*.tar.gz
+BUILD_TARGET=./cmd/<actual-cli-name>
+```
+
+### Makefile
+
+Must have these targets: `tidy`, `fmt`, `test`, `bdd-test`, `ci`, `build`, `cross-build`, `clean`.
+The `ci` target must run: format check, `go vet`, unit tests, BDD tests, and build.
+
+### README.md
+
+Must include: project description, install instructions (release download + build from source), required configuration (env vars), command list, and usage examples.
 
 ## Code Architecture Contract
 
@@ -183,23 +227,38 @@ Must define `ExitCode(err error) int` in `internal/cmd/root.go`:
 
 ## Delivery Verification (Required Before Done)
 
-Before marking delivery complete, verify all of the following:
+Before marking delivery complete, verify **every** item below. If any item fails, fix it before continuing.
 
-1. **API completeness**: Cross-check every operation in `openapi-command-plan.md` (or API docs). Confirm all query parameters, request body fields, and response fields are implemented — not just the happy path. Every parameter the API accepts must have a corresponding CLI flag.
-2. **Model JSON tags**: Every field in model structs under `internal/model/` must have a correct `json:"..."` tag matching the API response field name.
-3. **Format check**: Run `gofmt -l ./cmd ./internal ./tests` and confirm zero output.
-4. **Build check**: Run `make ci` and confirm it passes.
-5. **Naming consistency**: All references to binary name, CLI name, and build target must match `release-naming.env`.
-6. **Package layout**: Confirm all required directories exist: `cmd/<name>/`, `internal/cmd/`, `internal/client/`, `internal/model/`, `internal/output/`.
-7. **Cobra pattern**: Confirm no `func init()` in any file under `internal/cmd/`.
-8. **go.mod module path**: Must be `github.com/<owner>/<repo>` — not a bare name.
-9. **Output formatter**: `internal/output/output.go` exists and implements `Formatter`.
-10. **Exit codes**: `ExitCode` function exists in `internal/cmd/root.go`.
-11. **Binary location**: `bin/` is in `.gitignore` and no compiled binaries exist at repo root.
-12. **Tests exist**: At least one `_test.go` file exists in the project.
+### Scaffold files (must exist)
+
+1. **release-naming.env**: Exists at repo root with all 5 variables (`CLI_NAME`, `BINARY_NAME`, `TAG_PREFIX`, `ARTIFACT_GLOB`, `BUILD_TARGET`) — no placeholders.
+2. **Makefile**: Exists at repo root with targets `ci`, `build`, `test`, `bdd-test`, `cross-build`, `clean`. Values must match `release-naming.env`.
+3. **.gitignore**: Exists, includes `bin/` and `dist/`.
+4. **README.md**: Exists with install instructions, required configuration, command list, and usage examples.
+5. **scripts/next-version.sh**: Exists and is executable.
+6. **GitHub Actions**: `.github/workflows/go-ci.yml` exists. At least one release workflow (`release-on-tag.yml` or `release-on-tag-manual.yml`) exists. `release-command.yml` exists.
+7. **Binary location**: `bin/` is in `.gitignore`. No compiled binaries at repo root.
+
+### Code architecture (must pass)
+
+8. **Package layout**: All required directories exist: `cmd/<name>/`, `internal/cmd/`, `internal/client/`, `internal/model/`, `internal/output/`.
+9. **Cobra pattern**: No `func init()` in any file under `internal/cmd/`.
+10. **go.mod module path**: Must be `github.com/<owner>/<repo>` — not a bare name.
+11. **Output formatter**: `internal/output/output.go` exists and implements `Formatter`.
+12. **Exit codes**: `ExitCode` function exists in `internal/cmd/root.go`.
 13. **Required deps**: `go.mod` contains both `github.com/spf13/cobra` and `github.com/itchyny/gojq`.
 14. **List aliases**: Every `list` subcommand has `Aliases: []string{"ls"}`.
 15. **Flag naming**: No flags use underscores — use kebab-case (`--updated-after`, not `--updated_gt`).
+
+### API and quality (must pass)
+
+16. **API completeness**: Cross-check every operation in `openapi-command-plan.md` (or API docs). Every parameter the API accepts must have a corresponding CLI flag.
+17. **Model JSON tags**: Every field in model structs under `internal/model/` must have a correct `json:"..."` tag matching the API response field name.
+18. **Format check**: Run `gofmt -l ./cmd ./internal ./tests` and confirm zero output.
+19. **Build check**: Run `make ci` and confirm it passes.
+20. **Naming consistency**: All references to binary name, CLI name, and build target must match `release-naming.env`.
+21. **Tests exist**: At least one `_test.go` file exists. Client package must have tests using `httptest`.
+22. **BDD structure**: `tests/bdd/features/` contains at least one `.feature` file and `tests/bdd/steps/` contains at least one `_test.go` file.
 
 ## What To Load
 
