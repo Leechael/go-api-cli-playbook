@@ -218,6 +218,11 @@ func newStatusCmd() *cobra.Command {
 }
 ```
 
+**When to use which pattern:**
+- If an API resource has **multiple actions** (list, get, save, update, delete), use a **resource group** with subcommands (see section 5).
+- If an API operation **stands alone** with no sibling actions (e.g., export, daily review), use a **top-level command** like this — do not wrap it in a single-child subcommand group. `cli export` is correct; `cli export list` is wrong when there is only one action.
+- Command names must match the API's own verbs. If the endpoint is `/save/`, use `save`; if it is `/export/`, use `export`. Do not rename to generic CRUD terms unless the API itself uses them.
+
 ---
 
 ## 5. Resource Group with Subcommands — `internal/cmd/reader.go`
@@ -232,6 +237,7 @@ import (
 
 // newReaderCmd groups reader-related subcommands.
 // The parent command has no RunE — it just prints help.
+// Only create a group when a resource has MULTIPLE distinct actions.
 func newReaderCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "reader",

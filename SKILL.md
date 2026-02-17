@@ -73,6 +73,7 @@ Use this skill when a Go project is converting an API into a CLI and you need pr
 - Auth/connectivity check uses a `status` command (not `auth check` or similar).
 - Credentials via environment variable named `<SERVICE>_API_TOKEN` (e.g. `READWISE_API_TOKEN`).
 - `list` commands should accept `ls` as an alias.
+- Command and subcommand names must match the API's own terminology. If the API endpoint is `/save/`, use `save`; if it is `/export/`, use `export`. Do not rename API verbs to generic CRUD terms (`create`, `read`, `update`, `delete`) unless the API itself uses those terms.
 
 ## Project Scaffold Contract
 
@@ -159,9 +160,15 @@ Must define `ExitCode(err error) int` in `internal/cmd/root.go`:
 
 ### Subcommand Naming
 
-- Match API brand terms (e.g., if the API calls it "Reader", use `reader`, not `document`).
+- Match API brand terms — use the exact name the API uses (e.g., if the API calls it "Reader", use `reader`, not `document`; if the API endpoint is `/save/`, use `save`, not `create`).
 - Every `list` subcommand must have `Aliases: []string{"ls"}`.
 - Flags use **kebab-case** with human-friendly names (`--updated-after`, not `--updated_gt`).
+
+### Command Depth
+
+- Only create a subcommand group when a resource has **multiple distinct actions** (e.g., `reader list`, `reader get`, `reader save`).
+- If an API operation stands alone with no sibling actions, expose it as a **top-level command** — do not wrap it in a single-child subcommand group. For example, if the API has one export endpoint, use `cli export`, not `cli export list`.
+- The same applies to operations like daily review — `cli review` is correct; `cli review list` is wrong when there is only one action.
 
 ### Output Formatter
 
@@ -257,8 +264,9 @@ Before marking delivery complete, verify **every** item below. If any item fails
 18. **Format check**: Run `gofmt -l ./cmd ./internal ./tests` and confirm zero output.
 19. **Build check**: Run `make ci` and confirm it passes.
 20. **Naming consistency**: All references to binary name, CLI name, and build target must match `release-naming.env`.
-21. **Tests exist**: At least one `_test.go` file exists. Client package must have tests using `httptest`.
+21. **Tests exist**: At least one `_test.go` file exists. Client package must have tests using `httptest`. Output package must have tests for `Formatter` (JSON, plain, and jq modes).
 22. **BDD structure**: `tests/bdd/features/` contains at least one `.feature` file and `tests/bdd/steps/` contains at least one `_test.go` file.
+23. **Command structure**: No single-child subcommand groups — if a resource has only one action, it must be a top-level command (e.g., `cli export`, not `cli export list`).
 
 ## What To Load
 
