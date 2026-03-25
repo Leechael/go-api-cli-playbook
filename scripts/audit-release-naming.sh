@@ -18,7 +18,7 @@ fi
 # shellcheck disable=SC1090
 source "$env_file"
 
-for key in CLI_NAME BINARY_NAME TAG_PREFIX ARTIFACT_GLOB BUILD_TARGET; do
+for key in CLI_NAME BINARY_NAME TAG_PREFIX ARTIFACT_GLOB BUILD_TARGET VERSION_VAR_PATH; do
   if [[ -z "${!key:-}" ]]; then
     echo "release-naming.env missing value: $key" >&2
     exit 1

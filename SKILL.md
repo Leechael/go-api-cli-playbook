@@ -34,6 +34,7 @@ Use this skill when a Go project is converting an API into a CLI and you need pr
    - Copies Makefile, .gitignore, and README.md from `assets/templates/`.
    - Replace placeholders (`your-cli`, `OWNER/REPO`, `YOUR_SERVICE_NAME`) to match `release-naming.env`.
    - Copy `assets/templates/scripts/next-version.sh` to `scripts/next-version.sh` and `chmod +x`.
+   - Copy `assets/templates/version.go` to `pkg/version/version.go` (or similar) and customize.
 5. **Scaffold Go packages** (all of these, not just some):
    - `cmd/<cli-name>/main.go` — minimal entry point.
    - `internal/cmd/root.go` — `NewRootCmd` factory, global flags, exit codes.
@@ -238,8 +239,8 @@ Before marking delivery complete, verify **every** item below. If any item fails
 
 ### Scaffold files (must exist)
 
-1. **release-naming.env**: Exists at repo root with all 5 variables (`CLI_NAME`, `BINARY_NAME`, `TAG_PREFIX`, `ARTIFACT_GLOB`, `BUILD_TARGET`) — no placeholders.
-2. **Makefile**: Exists at repo root with targets `ci`, `build`, `test`, `bdd-test`, `cross-build`, `clean`. Values must match `release-naming.env`.
+1. **release-naming.env**: Exists at repo root with all 6 variables (`CLI_NAME`, `BINARY_NAME`, `TAG_PREFIX`, `ARTIFACT_GLOB`, `BUILD_TARGET`, `VERSION_VAR_PATH`) — no placeholders.
+2. **Makefile**: Exists at repo root with targets `ci`, `build`, `test`, `bdd-test`, `cross-build`, `clean`. Values must match `release-naming.env` and implement version embedding.
 3. **.gitignore**: Exists, includes `bin/` and `dist/`.
 4. **README.md**: Exists with install instructions, required configuration, command list, and usage examples.
 5. **scripts/next-version.sh**: Exists and is executable.
@@ -277,6 +278,7 @@ Before marking delivery complete, verify **every** item below. If any item fails
 - For packaging strategy and naming mapping: `references/release-packaging-strategies.md`
 - For `prek` setup and commands: `references/prek-precommit.md`
 - For copy-ready templates: `assets/templates/.github/workflows/*.yml`
+- For standardized project structure: `assets/templates/Makefile`, `assets/templates/version.go`
 - For tag versioning script: `assets/templates/scripts/next-version.sh`
 - For naming contract template: `assets/templates/release-naming.env`
 - For a ready `prek` config: `assets/templates/prek.toml`

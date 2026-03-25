@@ -60,6 +60,7 @@ jobs:
           test -n "$TAG_PREFIX"
           test -n "$ARTIFACT_GLOB"
           test -n "$BUILD_TARGET"
+          test -n "$VERSION_VAR_PATH"
 
       - name: Build cross-platform artifacts
         run: |
@@ -69,7 +70,7 @@ jobs:
             for arch in amd64 arm64; do
               artifact="dist/${BINARY_NAME}-${os}-${arch}.tar.gz"
               tmpdir=$(mktemp -d)
-              CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -o "$tmpdir/${BINARY_NAME}" "$BUILD_TARGET"
+              CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -ldflags="-s -w -X ${VERSION_VAR_PATH}=${RELEASE_TAG#${TAG_PREFIX}}" -o "$tmpdir/${BINARY_NAME}" "$BUILD_TARGET"
               tar -czf "$artifact" -C "$tmpdir" "$BINARY_NAME"
               rm -rf "$tmpdir"
             done
