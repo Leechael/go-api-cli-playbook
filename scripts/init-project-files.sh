@@ -6,7 +6,7 @@ usage() {
 Usage:
   scripts/init-project-files.sh [--force] <target-repo-dir>
 
-Copies Makefile, .gitignore, and README.md templates to the target repo.
+Copies Makefile, .gitignore, README.md, and prek.toml templates to the target repo.
 
 Examples:
   scripts/init-project-files.sh /path/to/repo
@@ -34,7 +34,7 @@ fi
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 template_dir="$script_dir/../assets/templates"
 
-files=("Makefile" ".gitignore" "README.md")
+files=("Makefile" ".gitignore" "README.md" "prek.toml")
 copied=()
 
 for f in "${files[@]}"; do
@@ -71,4 +71,6 @@ Next steps:
   edit Makefile: set BINARY_NAME and CMD to match release-naming.env
   edit README.md: replace your-cli, OWNER/REPO, YOUR_SERVICE_NAME
   edit .gitignore: add any project-specific patterns
+  run prek validate-config
+  run prek install --install-hooks
 EOF

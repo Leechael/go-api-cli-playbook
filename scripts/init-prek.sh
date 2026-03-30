@@ -34,9 +34,19 @@ template="$script_dir/../assets/templates/prek.toml"
 dest="$target/prek.toml"
 
 if [[ -f "$dest" && "$force" != "true" ]]; then
-  echo "prek.toml already exists: $dest" >&2
-  echo "Use --force to overwrite." >&2
-  exit 1
+  cat <<EOF
+prek.toml already exists, skipping copy:
+  $dest
+
+Next steps:
+  cd $target
+  prek validate-config
+  prek install --install-hooks
+  prek run --all-files
+
+Use --force to overwrite existing prek.toml.
+EOF
+  exit 0
 fi
 
 cp "$template" "$dest"

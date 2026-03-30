@@ -53,17 +53,22 @@ Apply the playbook to a target Go CLI repository:
 # 2. If starting from API docs only, generate plan artifacts
 ./scripts/openapi-bootstrap.sh /path/to/openapi.json /path/to/your-repo/docs/openapi
 
-# 3. Set up pre-commit gate
-./scripts/init-prek.sh /path/to/your-repo
+# 3. Initialize core project files (includes prek.toml)
+./scripts/init-project-files.sh /path/to/your-repo
 
-# 4. Copy workflow templates into your repo and replace placeholders
+# 4. Set up pre-commit gate and hooks
+cd /path/to/your-repo
+prek validate-config
+prek install --install-hooks
+prek run --all-files
 
-# 5. Audit for drift
+# 5. Copy workflow templates into your repo and replace placeholders
+
+# 6. Audit for drift
 ./scripts/audit-workflows.sh /path/to/your-repo
 ./scripts/audit-release-naming.sh /path/to/your-repo
 
-# 6. Validate locally
-prek run --all-files
+# 7. Validate locally
 go test ./...
 ```
 
